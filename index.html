@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Linear Timer App</title>
+<style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .timer-block { margin: 30px 0; }
+    .bar-wrap { position: relative; width: 100%; height: 40px; background: #f0f0f0; border-radius: 8px; }
+    .bar-fill { position: absolute; top: 0; left: 0; height: 100%; background: #4caf50; border-radius: 8px; }
+    .agenda-marker {
+        position: absolute;
+        top: -25px;
+        padding: 4px 6px;
+        border-radius: 5px;
+        font-size: 12px;
+        cursor: grab;
+        white-space: nowrap;
+        transform: translateX(-50%);
+        color: #fff;
+    }
+    .info { margin-top: 5px; font-size: 14px; }
+    .hash-top, .hash-bottom {
+        position: absolute; width: 1px; background: black;
+    }
+</style>
+</head>
+<body>
+
+<h2>Linear Timer App</h2>
+
+<label>Timer Name: <input id="tname"></label><br>
+<label>Start Time: <input type="time" id="start"></label><br>
+<label>End Time: <input type="time" id="end"></label><br>
+<label>Color: <input type="color" id="color" value="#4caf50"></label><br>
+<label>Height(px): <input type="number" id="height" value="40"></label><br>
+<button onclick="createTimer()">Add Timer</button>
+
+<div id="timers"></div>
+
+<script>
+function parseTime(t){
+    let [h,m]=t.split(':').map(Number);
+    return h*60+m;
+}
+
+function createTimer(){
+    let name=document.getElementById("tname").value;
+    let st=parseTime(document.getElementById("start").value);
+    let et=parseTime(document.getElementById("end").value);
+    let color=document.getElementById("color").value;
+    let height=document.getElementById("height").value;
+
+    if(isNaN(st)||isNaN(et)||st>=et){ alert("Invalid time"); return;}
+
+    let block=document.createElement("div");
+    block.className="timer-block";
+
+    let title=document.createElement("h3");
+    title.textContent=name;
+    block.appendChild(title);
+
+    let wrap=document.createElement("div");
+    wrap.className="bar-wrap";
+    wrap.style.height=height+"px";
+
+    let fill=document.createElement("div");
+    fill.className="bar-fill";
+    fill.style.background=color;
+    wrap.appendChild(fill);
+
+    // 10% hash marks
+    for(let i=1;i<10;i++){
+        let h=document.createElement("div");
+        h.className="hash-top";
+        h.style.left=(i*10)+"%";
+        h.style.top="-10px";
+        h.style.height="10px";
+        wrap.appendChild(h);
+    }
+
+    // 5-minute hash marks
+    let total=et-st;
+    for(let m=5;m<total;m+=5){
+        let pos=(m/total)*100;
+        let h=document.createElement("div");
+        h.className="hash-bottom";
+        h.style.left=pos+"%";
+        h.style.bottom="-10px";
+        h.style.height="10px";
+        wrap.appendChild(h);
+    }
+
+    block.appendChild(wrap);
+
+    let info=document.createElement("div");
+    info.className="info";
+    block.appendChild(info);
+
+    setInterval(()=>{
+        let now=new Date();
+        let mins=now.getHours()*60+now.getMinutes();
+        let pct=Math.min(100,Math.max(0,((mins-st)/(et-st))*100));
+        fill.style.width=pct+"%";
+        let passed=Math.max(0,mins-st);
+        let remain=Math.max(0,(et-mins));
+        info.textContent = passed+" min passed • "+remain+" min left • "+pct.toFixed(1)+"%";
+    },1000);
+
+    let addAgendaBtn=document.createElement("button");
+    addAgendaBtn.textContent="Add Agenda Item";
+    addAgendaBtn.onclick=function(){
+        let item=prompt("Agenda item text:");
+        let itemColor=prompt("Agenda color (hex or name):","#ff0000");
+        if(!item) return;
+        let marker=document.createElement("div");
+        marker.className="agenda-marker";
+        marker.textContent=item;
+        marker.style.background=itemColor;
+        marker.style.left="50%";
+
+        let drag=false;
+        marker.onmousedown=e=>{drag=true;};
+        document.onmouseup=e=>{drag=false;};
+        document.onmousemove=e=>{
+            if(!drag) return;
+            let rect=wrap.getBoundingClientRect();
+            let x=e.clientX-rect.left;
+            x=Math.max(0,Math.min(x,rect.width));
+            marker.style.left=(x/rect.width*100)+"%";
+        };
+
+        wrap.appendChild(marker);
+    };
+    block.appendChild(addAgendaBtn);
+
+    document.getElementById("timers").appendChild(block);
+}
+</script>
+
+</body>
+</html>
