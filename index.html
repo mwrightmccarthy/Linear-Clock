@@ -1,248 +1,133 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Linear Timer Generator</title>
-<style>
-  :root{ --bg:#f6f8fb; --card:#fff; --muted:#6b7a90; --accent:#0b66ff; }
-  body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial; background:var(--bg); margin:0; padding:28px; display:flex; justify-content:center;}
-  .wrap{width:100%; max-width:1100px;}
-  header{text-align:center;margin-bottom:18px;}
-  h1{margin:0 0 6px;}
-  .lead{color:var(--muted); font-size:14px; margin-bottom:8px;}
-  .card{background:var(--card); padding:18px; border-radius:12px; box-shadow:0 8px 30px rgba(12,25,40,0.06);}
-  form.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px;}
-  label{font-size:13px; color:#1f2d3d;}
-  input[type="text"], input[type="time"], input[type="number"]{padding:8px 10px; border-radius:8px; border:1px solid #dfe9f5; font-size:14px;}
-  input[type="color"]{width:44px; height:36px; border:0; padding:0; background:transparent; cursor:pointer;}
-  button{background:var(--accent); color:#fff; border:0; padding:9px 14px; border-radius:8px; cursor:pointer; font-weight:600;}
-  .controls{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px;}
-  .timers{margin-top:18px; display:flex; flex-direction:column; gap:18px;}
-  .timer-card{background:#fff; border-radius:8px; padding:14px; box-shadow:0 6px 18px rgba(0,0,0,0.04);}
-  .timer-header{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;}
-  .timer-title{font-weight:700; font-size:16px;}
-  .timer-meta{color:var(--muted); font-size:13px;}
-  .bar-wrap{position:relative; padding:18px 10px 8px;}
-  .bar-bg{height:var(--height,28px); background:#eef2f7; border-radius:6px; position:relative; overflow:visible;}
-  .bar-fill{height:100%; background:var(--color,#4caf50); width:0%; transition:width 0.6s linear; position:relative;}
-  .bar-inner-text{position:absolute; inset:0; display:flex; justify-content:space-between; align-items:center; padding:0 10px; pointer-events:none; font-weight:700; color:#fff; font-size:14px;}
-  .bar-inner-text .left{transform:translateX(0);} 
-  .bar-inner-text .right{transform:translateX(0); color:#000;} 
-  /* Top ticks (10% increments) */
-  .ticks-top{position:relative; height:22px; margin-bottom:6px; display:block;}
-  .tick-top{position:absolute; top:6px; width:1px; height:10px; background:#aab6c8;}
-  .tick-label{position:absolute; top:0; transform:translateX(-50%); font-size:11px; color:#4b5868;}
-  /* Bottom ticks (5 minute increments) */
-  .ticks-bottom{position:relative; height:32px; margin-top:8px; display:block;}
-  .tick-btm{position:absolute; bottom:14px; width:1px; height:10px; background:#c4cdd8;}
-  .tick-btm-label{position:absolute; bottom:0; transform:translateX(-50%); font-size:11px; color:#4b5868;}
-  .minutes-info{display:flex; justify-content:space-between; margin-top:8px; font-weight:600;}
-  .small{font-size:13px; color:var(--muted); margin-top:6px;}
-  .row-right{display:flex; gap:8px; align-items:center;}
-  @media (max-width:720px){ .bar-inner-text{font-size:12px;} .bar-wrap{padding:12px 6px 6px;} }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linear Timers with Agenda Items</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f8f8f8;
+    }
+    h2 {
+      margin-top: 40px;
+    }
+    .timer {
+      margin: 30px 0;
+      padding: 20px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .bar-container {
+      position: relative;
+      width: 100%;
+      background: #e0e0e0;
+      border-radius: 10px;
+      margin-top: 10px;
+      overflow: visible;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.3s linear;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-weight: bold;
+    }
+    .ticks-top, .ticks-bottom {
+      position: relative;
+      width: 100%;
+      height: 20px;
+      margin-top: 5px;
+    }
+    .tick {
+      position: absolute;
+      width: 2px;
+      background: black;
+    }
+    .tick-label {
+      position: absolute;
+      transform: translateX(-50%);
+      font-size: 10px;
+    }
+    /* Agenda marker */
+    .agenda-marker {
+      position: absolute;
+      top: -10px;
+      width: 2px;
+      height: calc(100% + 20px);
+      background: red;
+    }
+    .agenda-label {
+      position: absolute;
+      top: -22px;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: bold;
+      color: red;
+    }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>Linear Timer Generator</h1>
-    <div class="lead">Create named timers with custom color and height. Live minutes elapsed/remaining, percentages in-bar, and scale ticks.</div>
-  </header>
+  <h1>Linear Timers with Agenda Items</h1>
 
-  <div class="card">
-    <form id="addForm" class="row" onsubmit="event.preventDefault(); addTimer();">
-      <div class="controls">
-        <label>Timer name<br><input id="tName" type="text" placeholder="e.g., Period 1" required></label>
-        <label>Start<br><input id="tStart" type="time" required></label>
-        <label>End<br><input id="tEnd" type="time" required></label>
-        <label>Color<br><input id="tColor" type="color" value="#d33a3a"></label>
-        <label>Height (px)<br><input id="tHeight" type="number" value="28" min="8" max="120"></label>
-        <div class="row-right">
-          <button id="addBtn" type="submit">Add Timer</button>
-        </div>
-      </div>
-    </form>
+  <h2>Create New Timer</h2>
+  <label>Timer Name: <input id="name" /></label><br>
+  <label>Start Time: <input id="start" type="datetime-local" /></label><br>
+  <label>End Time: <input id="end" type="datetime-local" /></label><br>
+  <label>Color: <input id="color" type="color" /></label><br>
+  <label>Height (px): <input id="height" type="number" value="30" /></label><br>
+  <button onclick="addTimer()">Create Timer</button>
 
-    <div class="small">Top ticks: 10% increments. Bottom ticks: every 5 minutes (labels every 15 minutes for readability).</div>
-
-    <div class="timers" id="timers"></div>
-  </div>
-</div>
+  <div id="timers"></div>
 
 <script>
-// Utilities
-function toMinutesFromHM(hmStr){
-  const [h,m] = hmStr.split(':').map(Number);
-  return h*60 + m;
-}
-function minutesToHM(mins){
-  mins = ((mins%1440)+1440)%1440;
-  const h = Math.floor(mins/60);
-  const m = mins%60;
-  const hh = h.toString().padStart(2,'0');
-  const mm = m.toString().padStart(2,'0');
-  return `${hh}:${mm}`;
-}
-function formatHMForDisplay(hm){
-  const [h,m] = hm.split(':').map(Number);
-  const am = h<12;
-  const hh = ((h+11)%12)+1;
-  return `${hh}:${m.toString().padStart(2,'0')} ${am?'AM':'PM'}`;
-}
+// Enable drag-to-position for timers
+function makeTimersDraggable() {
+  const timers = document.querySelectorAll('.timer-block');
+  timers.forEach(timer => {
+    timer.style.position = 'relative';
+    timer.style.cursor = 'grab';
 
-// Timer management
-let timers = [];
-let timerId = 0;
+    let offsetX = 0;
+    let offsetY = 0;
+    let isDown = false;
 
-function addTimer(){
-  const name = document.getElementById('tName').value.trim();
-  const start = document.getElementById('tStart').value;
-  const end = document.getElementById('tEnd').value;
-  const color = document.getElementById('tColor').value;
-  const height = Number(document.getElementById('tHeight').value) || 28;
+    timer.addEventListener('mousedown', (e) => {
+      isDown = true;
+      timer.style.cursor = 'grabbing';
+      offsetX = e.clientX - timer.offsetLeft;
+      offsetY = e.clientY - timer.offsetTop;
+    });
 
-  if(!name || !start || !end){ alert('Please provide name, start and end times.'); return; }
+    document.addEventListener('mouseup', () => {
+      isDown = false;
+      timer.style.cursor = 'grab';
+    });
 
-  const id = 'timer-'+(timerId++);
-  const container = document.createElement('div');
-  container.className = 'timer-card';
-  container.id = id;
-
-  container.innerHTML = `
-    <div class="timer-header">
-      <div>
-        <div class="timer-title">${name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-        <div class="timer-meta">${formatHMForDisplay(start)} → ${formatHMForDisplay(end)}</div>
-      </div>
-      <div class="row-right">
-        <button onclick="removeTimer('${id}')">Remove</button>
-      </div>
-    </div>
-
-    <div class="bar-wrap">
-      <div class="ticks-top" id="${id}-ticks-top"></div>
-      <div class="bar-bg" style="--height:${height}px;" aria-hidden="true">
-        <div class="bar-fill" id="${id}-fill" style="--color:${color}; background:${color}; height:${height}px; width:0%"></div>
-        <div class="bar-inner-text" id="${id}-inner">
-          <div class="left" id="${id}-left-text"></div>
-          <div class="right" id="${id}-right-text"></div>
-        </div>
-      </div>
-      <div class="ticks-bottom" id="${id}-ticks-bottom"></div>
-      <div class="minutes-info"><div id="${id}-mins-gone">0 min gone</div><div id="${id}-mins-left">0 min left</div></div>
-    </div>
-  `;
-
-  document.getElementById('timers').prepend(container);
-
-  timers.push({
-    id, name, start, end, color, height,
-    startMin: toMinutesFromHM(start),
-    endMin: toMinutesFromHM(end)
-  });
-
-  renderTopTicks(id);
-  renderBottomTicks(id);
-
-  document.getElementById('tName').value = '';
-}
-
-function removeTimer(id){
-  const el = document.getElementById(id);
-  if(el) el.remove();
-  timers = timers.filter(t=>t.id!==id);
-}
-
-// Top ticks: 10% increments
-function renderTopTicks(id){
-  const top = document.getElementById(id+'-ticks-top');
-  top.innerHTML = '';
-  for(let i=0;i<=10;i++){
-    const pct = i*10;
-    const div = document.createElement('div');
-    div.className = 'tick-top';
-    div.style.left = pct + '%';
-    top.appendChild(div);
-    const lbl = document.createElement('div');
-    lbl.className = 'tick-label';
-    lbl.style.left = pct + '%';
-    lbl.textContent = pct + '%';
-    top.appendChild(lbl);
-  }
-}
-
-// Bottom ticks: every 5 minutes, label every 15 minutes
-function renderBottomTicks(id){
-  const t = timers.find(x=>x.id===id);
-  if(!t) return;
-  const bottom = document.getElementById(id+'-ticks-bottom');
-  bottom.innerHTML = '';
-
-  let s = t.startMin, e = t.endMin;
-  let duration = (e>=s) ? (e-s) : (1440 - s + e);
-  const steps = Math.floor(duration / 5);
-  for(let i=0;i<=steps;i++){
-    const minutesFromStart = i*5;
-    const percent = (minutesFromStart / duration) * 100;
-    const tick = document.createElement('div');
-    tick.className = 'tick-btm';
-    tick.style.left = percent + '%';
-    bottom.appendChild(tick);
-
-    if((i%3)===0){
-      const lbl = document.createElement('div');
-      lbl.className = 'tick-btm-label';
-      lbl.style.left = percent + '%';
-      let labelMin = (t.startMin + minutesFromStart) % 1440;
-      const hh = Math.floor(labelMin/60), mm = labelMin%60;
-      const ampmH = ((hh+11)%12)+1;
-      const ampm = hh<12?'AM':'PM';
-      lbl.textContent = `${ampmH}:${mm.toString().padStart(2,'0')}${ampm}`;
-      bottom.appendChild(lbl);
-    }
-  }
-}
-
-// Update loop
-function updateAll(){
-  const now = new Date();
-  const nowMin = now.getHours()*60 + now.getMinutes() + now.getSeconds()/60;
-  timers.forEach(t=>{
-    let s = t.startMin, e = t.endMin;
-    let duration = (e>=s) ? (e-s) : (1440 - s + e);
-    let since = (nowMin - s + 1440) % 1440;
-    if(since<0) since += 1440;
-    if(since>duration) since = duration;
-    const pct = duration===0?100: Math.max(0, Math.min(100, (since/duration)*100));
-    const minsGone = Math.floor(since);
-    const minsLeft = Math.ceil(Math.max(0, duration - since));
-
-    const fill = document.getElementById(t.id+'-fill');
-    const leftText = document.getElementById(t.id+'-left-text');
-    const rightText = document.getElementById(t.id+'-right-text');
-    const minsGoneEl = document.getElementById(t.id+'-mins-gone');
-    const minsLeftEl = document.getElementById(t.id+'-mins-left');
-
-    if(fill){
-      fill.style.width = pct + '%';
-      fill.style.background = t.color;
-      fill.style.height = t.height + 'px';
-      fill.parentElement.style.setProperty('--height', t.height+'px');
-    }
-    if(leftText) leftText.textContent = `${pct.toFixed(1)}%`;
-    if(rightText) rightText.textContent = `${(100-pct).toFixed(1)}%`;
-    if(minsGoneEl) minsGoneEl.textContent = `${minsGone} min gone`;
-    if(minsLeftEl) minsLeftEl.textContent = `${minsLeft} min left`;
+    document.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      timer.style.left = (e.clientX - offsetX) + 'px';
+      timer.style.top = (e.clientY - offsetY) + 'px';
+    });
   });
 }
 
-// run updates
-setInterval(updateAll, 1000);
-updateAll();
+// Re-run draggable assignment whenever a timer is created
+const originalCreateTimer = window.createTimer;
+window.createTimer = function() {
+  originalCreateTimer();
+  setTimeout(() => makeTimersDraggable(), 50);
+};
 
-// visibility change update
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) updateAll(); });
+// Run on page load
+window.onload = function() {
+  makeTimersDraggable();
+};
 </script>
 </body>
 </html>
