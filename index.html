@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Linear Timer App — Full</title>
+<style>
+  :root{--bg:#f6f8fb;--card:#fff;--muted:#567;color-scheme:light;}
+  body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial; background:var(--bg); margin:0; padding:24px; display:flex; justify-content:center;}
+  .wrap{width:100%;max-width:1100px;}
+  header{text-align:center;margin-bottom:10px}
+  h1{margin:0 0 6px;font-size:22px}
+  .lead{color:#6b7a90;margin-bottom:14px}
+  .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 8px 30px rgba(12,25,40,0.06)}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  input[type="text"], input[type="time"], input[type="number"], select {padding:8px;border-radius:8px;border:1px solid #e2eaf6;font-size:14px}
+  input[type="color"]{width:44px;height:36px;border:0;padding:0;background:transparent}
+  button{background:#0b66ff;color:#fff;border:0;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+  .timers{margin-top:14px;display:flex;flex-direction:column;gap:18px}
+  .timer{background:#fff;border-radius:10px;padding:12px;box-shadow:0 6px 18px rgba(0,0,0,0.04);position:relative}
+  .timer-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .meta{color:#6b7a90;font-size:13px}
+  .bar-area{padding:12px 8px 6px}
+  .ticks-top{position:relative;height:22px;margin-bottom:6px}
+  .tick-top{position:absolute;top:8px;width:1px;height:10px;background:#aab6c8}
+  .tick-top-label{position:absolute;top:0;transform:translateX(-50%);font-size:11px;color:#4b5868}
+  .bar-wrapper{position:relative;background:#eef2f7;border-radius:8px;overflow:visible}
+  .bar{height:var(--height,28px);border-radius:6px;position:relative;background:#f1f5f9}
+  .bar-fill{position:absolute;left:0;top:0;height:100%;width:0;border-radius:6px 0 0 6px;transition:width 0.3s linear}
+  .bar-text{position:absolute;left:8px;top:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-weight:700;color:#fff;pointer-events:none;font-size:14px}
+  .bar-text .right{color:#000;background:transparent;padding-left:6px}
+  .ticks-bottom{position:relative;height:30px;margin-top:8px}
+  .tick-btm{position:absolute;bottom:12px;width:1px;height:10px;background:#c4cdd8}
+  .tick-btm-label{position:absolute;bottom:0;transform:translateX(-50%);font-size:11px;color:#4b5868}
+  .mins{display:flex;justify-content:space-between;margin-top:8px;font-weight:700}
+  .agenda-panel{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .agenda-inputs input[type="text"]{min-width:180px}
+  .agenda-item{position:absolute;top:-26px;transform:translateX(-50%);padding:4px 8px;border-radius:6px;color:#fff;font-size:12px;cursor:grab;white-space:nowrap;box-shadow:0 3px 8px rgba(0,0,0,0.12)}
+  .agenda-line{position:absolute;top:-6px;width:2px;height:calc(100% + 12px);}
+  .small{font-size:13px;color:#6b7a90;margin-top:8px}
+  .btn-ghost{background:#fff;color:#0b66ff;border:1px solid #cfe0ff;padding:8px 10px;border-radius:8px;cursor:pointer}
+  .flex-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  @media(max-width:720px){ .bar-text{font-size:12px} .agenda-inputs input[type="text"]{min-width:120px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Linear Timer App — Full (Timers + Color-coded Agenda)</h1>
+    <div class="lead">Create timers, add color-coded agenda items, drag agenda markers, save locally.</div>
+  </header>
+
+  <div class="card">
+    <div class="controls" aria-label="create-timer">
+      <input id="timerName" type="text" placeholder="Timer name (e.g., Period 1)" />
+      <input id="timerStart" type="time" />
+      <input id="timerEnd" type="time" />
+      <input id="timerColor" type="color" value="#3b82f6" title="Bar color"/>
+      <input id="timerHeight" type="number" value="28" min="12" max="120" title="Height (px)"/>
+      <button id="addTimerBtn">Add Timer</button>
+      <button id="saveBtn" class="btn-ghost">Save</button>
+      <button id="loadBtn" class="btn-ghost">Load</button>
+      <button id="clearBtn" class="btn-ghost">Clear All</button>
+    </div>
+
+    <div class="small">Top ticks = 10% increments. Bottom ticks = 5-minute increments (labels every 15 min). Agenda items are color-coded and draggable.</div>
+
+    <div id="timers" class="timers" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+/* ---------- Utilities ---------- */
+function timeToMinutes(hm){ const [h,m]=hm.split(':').map(Number); return h*60+m; }
+function minutesToHM(min){ min = Math.round(min); min = ((min%1440)+1440)%1440; const h = Math.floor(min/60); const m = min%60; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; }
+function format12(hm){ const [h,m]=hm.split(':').map(Number); const am = h<12; const hh = ((h+11)%12)+1; return `${hh}:${String(m).padStart(2,'0')} ${am?'AM':'PM'}`; }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+/* ---------- State ---------- */
+let state = { timers: [] };
+
+/* load from localStorage if present */
+function saveState(){ localStorage.setItem('linearTimersV1', JSON.stringify(state)); alert('Saved locally'); }
+function loadState(){ const s = localStorage.getItem('linearTimersV1'); if(s){ state = JSON.parse(s); renderAll(); alert('Loaded'); } else alert('No saved data'); }
+function clearAll(){ if(!confirm('Clear all timers?')) return; state = {timers:[]}; renderAll(); localStorage.removeItem('linearTimersV1'); }
+
+/* ---------- Timer CRUD ---------- */
+function addTimerFromForm(){
+  const name = document.getElementById('timerName').value.trim();
+  const start = document.getElementById('timerStart').value;
+  const end = document.getElementById('timerEnd').value;
+  const color = document.getElementById('timerColor').value;
+  const height = Number(document.getElementById('timerHeight').value) || 28;
+  if(!name || !start || !end){ alert('Name, start and end required'); return; }
+  const s = timeToMinutes(start), e = timeToMinutes(end);
+  if(s===e){ alert('Start and end cannot be the same'); return; }
+  const id = 't_'+Date.now();
+  state.timers.unshift({ id,name,start:start,end:end,s,e,color,height,agenda:[] });
+  renderAll();
+  // clear name
+  document.getElementById('timerName').value='';
+}
+
+function removeTimer(id){
+  if(!confirm('Remove this timer?')) return;
+  state.timers = state.timers.filter(t=>t.id!==id);
+  renderAll();
+}
+
+/* ---------- Agenda Handling ---------- */
+function addAgenda(timerId, label, timeHM, color=null){
+  const timer = state.timers.find(t=>t.id===timerId); if(!timer) return;
+  const minutes = timeToMinutes(timeHM);
+  // ensure within range (allow wrap? here require between start and end if start<end, else wrap across midnight)
+  const s = timer.s, e = timer.e;
+  const dur = (e>=s)?(e-s):(1440 - s + e);
+  // compute offset from start in minutes (wrap-aware)
+  let offset = (minutes - s + 1440) % 1440;
+  if(offset>dur) { alert('Agenda must be within timer range'); return; }
+  const id = 'a_'+Date.now();
+  timer.agenda.push({ id,label,timeHM,minutes,color: color || '#d33a3a' });
+  renderAll();
+}
+
+/* ---------- Dragging agenda (pointer events) ---------- */
+function makeAgendaDraggable(el, timer){
+  el.style.touchAction='none';
+  let startX=0, origLeft=0, dragging=false;
+  function onPointerDown(e){
+    dragging=true; startX = e.clientX || e.touches && e.touches[0].clientX; origLeft = parseFloat(el.style.left)||0; el.setPointerCapture && el.setPointerCapture(e.pointerId);
+  }
+  function onPointerMove(e){
+    if(!dragging) return;
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const rect = el.parentElement.getBoundingClientRect();
+    let x = clientX - rect.left;
+    x = clamp(x, 0, rect.width);
+    const pct = x / rect.width;
+    const s = timer.s, e = timer.e; const dur = (e>=s)?(e-s):(1440 - s + e);
+    const minutes = Math.round(s + pct*dur);
+    el.style.left = (pct*100)+'%';
+    const aid = el.dataset.aid;
+    const agenda = timer.agenda.find(a=>a.id===aid);
+    if(agenda){ agenda.minutes = minutes; agenda.timeHM = minutesToHM(minutes); el.title = agenda.timeHM; }
+  }
+  function onPointerUp(e){ dragging=false; try{ el.releasePointerCapture && el.releasePointerCapture(e.pointerId);}catch(e){} }
+  el.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+}
+
+/* ---------- Rendering ---------- */
+function renderAll(){
+  const container = document.getElementById('timers'); container.innerHTML='';
+  state.timers.forEach(timer => {
+    const dur = (timer.e>=timer.s)?(timer.e-timer.s):(1440 - timer.s + timer.e);
+    const wrapper = document.createElement('div'); wrapper.className='timer'; wrapper.id = timer.id;
+    wrapper.innerHTML = `
+      <div class="timer-head">
+        <div>
+          <div style="font-weight:700">${escapeHtml(timer.name)}</div>
+          <div class="meta">${format12(timer.start)} → ${format12(timer.end)} • ${dur} min</div>
+        </div>
+        <div class="flex-row">
+          <button class="btn-ghost" onclick="removeTimer('${timer.id}')">Remove</button>
+        </div>
+      </div>
+      <div class="bar-area">
+        <div class="ticks-top" id="${timer.id}_top"></div>
+        <div class="bar-wrapper" style="--height:${timer.height}px">
+          <div class="bar" id="${timer.id}_bar" style="height:${timer.height}px">
+            <div class="bar-fill" id="${timer.id}_fill" style="background:${timer.color};"></div>
+            <div class="bar-text" id="${timer.id}_text"><div id="${timer.id}_left"></div><div class="right" id="${timer.id}_right"></div></div>
+          </div>
+        </div>
+        <div class="ticks-bottom" id="${timer.id}_bottom"></div>
+        <div class="mins"><div id="${timer.id}_gone">0 min gone</div><div id="${timer.id}_leftmin">0 min left</div></div>
+
+        <div class="agenda-panel">
+          <div class="agenda-inputs flex-row">
+            <input type="text" id="${timer.id}_agenda_label" placeholder="Agenda label">
+            <input type="time" id="${timer.id}_agenda_time">
+            <input type="color" id="${timer.id}_agenda_color" value="#d33a3a">
+            <button onclick="handleAddAgenda('${timer.id}')">Add Agenda</button>
+          </div>
+        </div>
+      </div>
+    `;
+    container.appendChild(wrapper);
+    renderTicks(timer);
+    renderAgendas(timer);
+  });
+  updateAll();
+}
+
+/* ---------- Ticks ---------- */
+function renderTicks(timer){
+  const top = document.getElementById(timer.id + '_top');
+  top.innerHTML='';
+  for(let i=0;i<=10;i++){
+    const pct = i*10;
+    const tick = document.createElement('div'); tick.className='tick-top'; tick.style.left = pct + '%'; top.appendChild(tick);
+    const lbl = document.createElement('div'); lbl.className='tick-top-label'; lbl.style.left = pct + '%'; lbl.textContent = pct + '%'; top.appendChild(lbl);
+  }
+  const bottom = document.getElementById(timer.id + '_bottom');
+  bottom.innerHTML='';
+  const dur = (timer.e>=timer.s)?(timer.e-timer.s):(1440 - timer.s + timer.e);
+  const steps = Math.ceil(dur/5);
+  for(let i=0;i<=steps;i++){
+    const minutesFromStart = i*5;
+    const pct = (minutesFromStart / dur) * 100;
+    const tick = document.createElement('div'); tick.className='tick-btm'; tick.style.left = pct + '%'; bottom.appendChild(tick);
+    if(i%3===0){ const lbl = document.createElement('div'); lbl.className='tick-btm-label'; lbl.style.left = pct + '%'; 
+      let labelMin = (timer.s + minutesFromStart) % 1440; const hh = Math.floor(labelMin/60); const mm = labelMin%60;
+      const ampm = hh<12?'AM':'PM'; const dispH = ((hh+11)%12)+1; lbl.textContent = `${dispH}:${String(mm).padStart(2,'0')}${ampm}`;
+      bottom.appendChild(lbl);
+    }
+  }
+}
+
+/* ---------- Agendas render & dragging ---------- */
+function renderAgendas(timer){
+  const bar = document.getElementById(timer.id + '_bar');
+  Array.from(bar.querySelectorAll('.agenda-item, .agenda-line')).forEach(n=>n.remove());
+  timer.agenda.forEach(ag=>{
+    // compute pct (wrap-aware)
+    const dur = (timer.e>=timer.s)?(timer.e-timer.s):(1440 - timer.s + timer.e);
+    const offset = (ag.minutes - timer.s + 1440) % 1440;
+    const pct = (offset / dur) * 100;
+    // marker
+    const marker = document.createElement('div'); marker.className='agenda-item'; marker.style.left = pct + '%'; marker.style.background = ag.color; marker.dataset.aid = ag.id;
+    marker.innerHTML = `<span class="label">${escapeHtml(ag.label)}</span>`;
+    marker.title = ag.timeHM || minutesToHM(ag.minutes);
+    bar.appendChild(marker);
+    // vertical line
+    const line = document.createElement('div'); line.className='agenda-line'; line.style.left = pct + '%'; line.style.color = ag.color; bar.appendChild(line);
+    makeAgendaDraggable(marker, timer);
+  });
+}
+
+/* ---------- Add agenda handler ---------- */
+function handleAddAgenda(timerId){
+  const timer = state.timers.find(t=>t.id===timerId); if(!timer) return;
+  const labelEl = document.getElementById(timerId + '_agenda_label'); const timeEl = document.getElementById(timerId + '_agenda_time'); const colorEl = document.getElementById(timerId + '_agenda_color');
+  const label = labelEl.value.trim(); const timeHM = timeEl.value; const color = colorEl.value;
+  if(!label || !timeHM){ alert('label and time required'); return; }
+  addAgenda(timerId, label, timeHM, color);
+  labelEl.value=''; timeEl.value=''; colorEl.value='#d33a3a';
+}
+
+/* ---------- Live update ---------- */
+function updateAll(){
+  const now = new Date(); const nowMin = now.getHours()*60 + now.getMinutes() + now.getSeconds()/60;
+  state.timers.forEach(timer=>{
+    const dur = (timer.e>=timer.s)?(timer.e-timer.s):(1440 - timer.s + timer.e);
+    let since = (nowMin - timer.s + 1440) % 1440;
+    if(since>dur) since = dur;
+    const pct = clamp((since/dur)*100,0,100);
+    const fill = document.getElementById(timer.id + '_fill'); if(fill){ fill.style.width = pct + '%'; fill.style.height = timer.height + 'px'; }
+    const left = document.getElementById(timer.id + '_left'); const right = document.getElementById(timer.id + '_right');
+    if(left) left.textContent = pct.toFixed(1) + '%';
+    if(right) right.textContent = (100-pct).toFixed(1) + '%';
+    const goneEl = document.getElementById(timer.id + '_gone'); const leftEl = document.getElementById(timer.id + '_leftmin');
+    const minsGone = Math.floor(Math.max(0, since)); const minsLeft = Math.ceil(Math.max(0, dur - since));
+    if(goneEl) goneEl.textContent = minsGone + ' min gone'; if(leftEl) leftEl.textContent = minsLeft + ' min left';
+    renderAgendas(timer);
+  });
+}
+
+/* ---------- util escape ---------- */
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;' }[c])); }
+
+/* ---------- init handlers ---------- */
+document.getElementById('addTimerBtn').addEventListener('click', addTimerFromForm);
+document.getElementById('saveBtn').addEventListener('click', saveState);
+document.getElementById('loadBtn').addEventListener('click', loadState);
+document.getElementById('clearBtn').addEventListener('click', clearAll);
+
+/* start update interval */
+setInterval(updateAll, 1000);
+
+/* expose for console/debug */
+window.appState = state;
+window.renderAll = renderAll;
+
+/* seed example (optional) */
+if(!localStorage.getItem('linearTimersV1')){
+  state.timers.push({
+    id:'t_example',
+    name:'Example Period',
+    start:'07:20', end:'08:10', s: timeToMinutes('07:20'), e: timeToMinutes('08:10'), color:'#3b82f6', height:28,
+    agenda:[ {id:'a1',label:'Do Now',minutes: timeToMinutes('07:25'), timeHM:'07:25', color:'#f97316'} ]
+  });
+  renderAll();
+} else {
+  loadState();
+}
+</script>
+</body>
+</html>
